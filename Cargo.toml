@@ -11,8 +11,14 @@ winit = "0.30.9"
 core-graphics-types = "0.2"
 cocoa = "0.25"
 core-graphics = "0.24"
+imgui = "0.12.0"
+imgui-winit-support = "0.13.0"
+rand = "0.9.0"
 
 
 [build-dependencies]
-bindgen = { path = "/Users/cheese/RustroverProjects/rust-bindgen/bindgen" }
+bindgen = { path = "../rust-bindgen/bindgen", optional = true }
+
+[features]
+bindgen = ["dep:bindgen"]
 

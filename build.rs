@@ -1,30 +1,27 @@
-use std::{env, fs};
-use std::os::macos::raw::stat;
 use std::path::PathBuf;
 use std::process::Command;
-use bindgen::CargoCallbacks;
+use std::{env, fs};
 
 fn main() {
-
-    compile_shaders();
+    #[cfg(feature = "bindgen")]
     generate_rust_types_from_shader_types();
-
+    compile_shaders();
 }
 
 // xcrun -sdk macosx metal -c shaders.metal -o shaders.air
 // xcrun -sdk macosx metallib shaders.air -o shaders.metallib
 fn compile_shaders() {
-
     println!("cargo:rerun-if-changed=shaders");
     let paths = fs::read_dir("shaders").unwrap();
 
     let mut i = 0;
 
     for path in paths {
-
         let path = path.unwrap().path();
         //panic!("{:?}", path.extension().unwrap());
-        if !path.extension().unwrap().eq("metal") { continue; }
+        if !path.extension().unwrap().eq("metal") {
+            continue;
+        }
         let output = Command::new("xcrun")
             .arg("-sdk")
             .arg("macosx")
@@ -34,7 +31,8 @@ fn compile_shaders() {
             .args(["-o", format!("shaders/shaders{i}.air").as_str()])
             .spawn()
             .unwrap()
-            .wait_with_output().unwrap();
+            .wait_with_output()
+            .unwrap();
         if !output.status.success() {
             panic!("shader compilation failed");
         }
@@ -59,8 +57,9 @@ fn compile_shaders() {
     }
 }
 
+#[cfg(feature = "bindgen")]
 fn generate_rust_types_from_shader_types() {
-    //println!("cargo:rerun-if-changed=shaders/shader_types.h");
+    println!("cargo:rerun-if-changed=shaders/shader_types.h");
 
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out = out.join("shader_bindings.rs");
@@ -68,10 +67,14 @@ fn generate_rust_types_from_shader_types() {
     let bindings = bindgen::Builder::default()
         .header("shaders/shader_types.h")
         .allowlist_type("Particle")
+        .allowlist_type("simd_float3")
+        .allowlist_type("ComputeArguments")
         .detect_include_paths(true)
-        .parse_callbacks(Box::new(CargoCallbacks::new()))
+        .derive_default(true)
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
-        .expect("Unable t o generate bindings");
+        .expect("Unable to enerate bindings");
 
     bindings.write_to_file(out).unwrap();
+    bindings.write_to_file("src/generated_header.rs").unwrap();
 }
