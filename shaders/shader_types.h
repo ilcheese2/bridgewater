@@ -6,23 +6,25 @@
 #define atomic_uint uint32_t
 #endif
 
-struct Particle {
+struct Particle { // https://gist.github.com/entropylost/75a3ff4e0fae22a27b408968de31c5d1
     vector_float3 position;
     vector_float3 velocity;
-    vector_float3 pred_velocity;
-    vector_float3 force;
+    vector_float3 pressure_acceleration;
+    vector_float3 acceleration;
     float density;
-    float density_derivative;
-    float pred_density;
-    float factor;
+    float advected_density; // ρ* / ρ_0
+    float factor;// s p / ρ^2 * ρ_0
+    float pressure_rho2;
+    //float pressure_rho2v;
 };
 
 struct ComputeArguments {
     float kernel_radius;
-    float mass;
-    int num_particles;
+    float particle_radius;
     float rest_density;
+    float volume;
+    int num_particles;
     atomic_uint time_step;
     atomic_float avg_density_derivative;
-    atomic_float avg_pred_density;
+    atomic_float density_error;
 };

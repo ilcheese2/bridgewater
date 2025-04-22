@@ -29,12 +29,12 @@ pub type vector_float3 = simd_float3;
 pub struct Particle {
     pub position: vector_float3,
     pub velocity: vector_float3,
-    pub pred_velocity: vector_float3,
-    pub force: vector_float3,
+    pub pressure_acceleration: vector_float3,
+    pub acceleration: vector_float3,
     pub density: f32,
-    pub density_derivative: f32,
-    pub pred_density: f32,
+    pub advected_density: f32,
     pub factor: f32,
+    pub pressure_rho2: f32,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
@@ -42,43 +42,47 @@ const _: () = {
     ["Alignment of Particle"][::std::mem::align_of::<Particle>() - 16usize];
     ["Offset of field: Particle::position"][::std::mem::offset_of!(Particle, position) - 0usize];
     ["Offset of field: Particle::velocity"][::std::mem::offset_of!(Particle, velocity) - 16usize];
-    ["Offset of field: Particle::pred_velocity"]
-        [::std::mem::offset_of!(Particle, pred_velocity) - 32usize];
-    ["Offset of field: Particle::force"][::std::mem::offset_of!(Particle, force) - 48usize];
+    ["Offset of field: Particle::pressure_acceleration"]
+        [::std::mem::offset_of!(Particle, pressure_acceleration) - 32usize];
+    ["Offset of field: Particle::acceleration"]
+        [::std::mem::offset_of!(Particle, acceleration) - 48usize];
     ["Offset of field: Particle::density"][::std::mem::offset_of!(Particle, density) - 64usize];
-    ["Offset of field: Particle::density_derivative"]
-        [::std::mem::offset_of!(Particle, density_derivative) - 68usize];
-    ["Offset of field: Particle::pred_density"]
-        [::std::mem::offset_of!(Particle, pred_density) - 72usize];
-    ["Offset of field: Particle::factor"][::std::mem::offset_of!(Particle, factor) - 76usize];
+    ["Offset of field: Particle::advected_density"]
+        [::std::mem::offset_of!(Particle, advected_density) - 68usize];
+    ["Offset of field: Particle::factor"][::std::mem::offset_of!(Particle, factor) - 72usize];
+    ["Offset of field: Particle::pressure_rho2"]
+        [::std::mem::offset_of!(Particle, pressure_rho2) - 76usize];
 };
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ComputeArguments {
     pub kernel_radius: f32,
-    pub mass: f32,
-    pub num_particles: ::std::os::raw::c_int,
+    pub particle_radius: f32,
     pub rest_density: f32,
+    pub volume: f32,
+    pub num_particles: ::std::os::raw::c_int,
     pub time_step: u32,
     pub avg_density_derivative: f32,
-    pub avg_pred_density: f32,
+    pub density_error: f32,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ComputeArguments"][::std::mem::size_of::<ComputeArguments>() - 28usize];
+    ["Size of ComputeArguments"][::std::mem::size_of::<ComputeArguments>() - 32usize];
     ["Alignment of ComputeArguments"][::std::mem::align_of::<ComputeArguments>() - 4usize];
     ["Offset of field: ComputeArguments::kernel_radius"]
         [::std::mem::offset_of!(ComputeArguments, kernel_radius) - 0usize];
-    ["Offset of field: ComputeArguments::mass"]
-        [::std::mem::offset_of!(ComputeArguments, mass) - 4usize];
-    ["Offset of field: ComputeArguments::num_particles"]
-        [::std::mem::offset_of!(ComputeArguments, num_particles) - 8usize];
+    ["Offset of field: ComputeArguments::particle_radius"]
+        [::std::mem::offset_of!(ComputeArguments, particle_radius) - 4usize];
     ["Offset of field: ComputeArguments::rest_density"]
-        [::std::mem::offset_of!(ComputeArguments, rest_density) - 12usize];
+        [::std::mem::offset_of!(ComputeArguments, rest_density) - 8usize];
+    ["Offset of field: ComputeArguments::volume"]
+        [::std::mem::offset_of!(ComputeArguments, volume) - 12usize];
+    ["Offset of field: ComputeArguments::num_particles"]
+        [::std::mem::offset_of!(ComputeArguments, num_particles) - 16usize];
     ["Offset of field: ComputeArguments::time_step"]
-        [::std::mem::offset_of!(ComputeArguments, time_step) - 16usize];
+        [::std::mem::offset_of!(ComputeArguments, time_step) - 20usize];
     ["Offset of field: ComputeArguments::avg_density_derivative"]
-        [::std::mem::offset_of!(ComputeArguments, avg_density_derivative) - 20usize];
-    ["Offset of field: ComputeArguments::avg_pred_density"]
-        [::std::mem::offset_of!(ComputeArguments, avg_pred_density) - 24usize];
+        [::std::mem::offset_of!(ComputeArguments, avg_density_derivative) - 24usize];
+    ["Offset of field: ComputeArguments::density_error"]
+        [::std::mem::offset_of!(ComputeArguments, density_error) - 28usize];
 };

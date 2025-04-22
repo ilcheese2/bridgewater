@@ -73,8 +73,8 @@ fn generate_rust_types_from_shader_types() {
         .derive_default(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
-        .expect("Unable to enerate bindings");
+        .expect("Unable to generate bindings");
 
     bindings.write_to_file(out).unwrap();
-    bindings.write_to_file("src/generated_header.rs").unwrap();
+    bindings.write_to_file("generated_header.rs").unwrap();
 }
