@@ -21,7 +21,9 @@ impl<T: Copy + Default, const N: usize, const A: usize> __BindgenVector<T, N, A>
         Self(v, [0; A])
     }
 }
+pub type simd_int3 = __BindgenVector<::std::os::raw::c_int, 3usize, 4usize>;
 pub type simd_float3 = __BindgenVector<f32, 3usize, 4usize>;
+pub type vector_int3 = simd_int3;
 pub type vector_float3 = simd_float3;
 #[repr(C)]
 #[repr(align(16))]
@@ -32,13 +34,15 @@ pub struct Particle {
     pub pressure_acceleration: vector_float3,
     pub acceleration: vector_float3,
     pub density: f32,
-    pub advected_density: f32,
+    pub density_adv: f32,
     pub factor: f32,
     pub pressure_rho2: f32,
+    pub pressure_rho2v: f32,
+    pub neighbors: ::std::os::raw::c_int,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Particle"][::std::mem::size_of::<Particle>() - 80usize];
+    ["Size of Particle"][::std::mem::size_of::<Particle>() - 96usize];
     ["Alignment of Particle"][::std::mem::align_of::<Particle>() - 16usize];
     ["Offset of field: Particle::position"][::std::mem::offset_of!(Particle, position) - 0usize];
     ["Offset of field: Particle::velocity"][::std::mem::offset_of!(Particle, velocity) - 16usize];
@@ -47,13 +51,17 @@ const _: () = {
     ["Offset of field: Particle::acceleration"]
         [::std::mem::offset_of!(Particle, acceleration) - 48usize];
     ["Offset of field: Particle::density"][::std::mem::offset_of!(Particle, density) - 64usize];
-    ["Offset of field: Particle::advected_density"]
-        [::std::mem::offset_of!(Particle, advected_density) - 68usize];
+    ["Offset of field: Particle::density_adv"]
+        [::std::mem::offset_of!(Particle, density_adv) - 68usize];
     ["Offset of field: Particle::factor"][::std::mem::offset_of!(Particle, factor) - 72usize];
     ["Offset of field: Particle::pressure_rho2"]
         [::std::mem::offset_of!(Particle, pressure_rho2) - 76usize];
+    ["Offset of field: Particle::pressure_rho2v"]
+        [::std::mem::offset_of!(Particle, pressure_rho2v) - 80usize];
+    ["Offset of field: Particle::neighbors"][::std::mem::offset_of!(Particle, neighbors) - 84usize];
 };
 #[repr(C)]
+#[repr(align(16))]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ComputeArguments {
     pub kernel_radius: f32,
@@ -64,11 +72,13 @@ pub struct ComputeArguments {
     pub time_step: u32,
     pub avg_density_derivative: f32,
     pub density_error: f32,
+    pub size: vector_float3,
+    pub grid_dims: vector_int3,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ComputeArguments"][::std::mem::size_of::<ComputeArguments>() - 32usize];
-    ["Alignment of ComputeArguments"][::std::mem::align_of::<ComputeArguments>() - 4usize];
+    ["Size of ComputeArguments"][::std::mem::size_of::<ComputeArguments>() - 64usize];
+    ["Alignment of ComputeArguments"][::std::mem::align_of::<ComputeArguments>() - 16usize];
     ["Offset of field: ComputeArguments::kernel_radius"]
         [::std::mem::offset_of!(ComputeArguments, kernel_radius) - 0usize];
     ["Offset of field: ComputeArguments::particle_radius"]
@@ -85,4 +95,23 @@ const _: () = {
         [::std::mem::offset_of!(ComputeArguments, avg_density_derivative) - 24usize];
     ["Offset of field: ComputeArguments::density_error"]
         [::std::mem::offset_of!(ComputeArguments, density_error) - 28usize];
+    ["Offset of field: ComputeArguments::size"]
+        [::std::mem::offset_of!(ComputeArguments, size) - 32usize];
+    ["Offset of field: ComputeArguments::grid_dims"]
+        [::std::mem::offset_of!(ComputeArguments, grid_dims) - 48usize];
+};
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ParticleLocation {
+    pub index: ::std::os::raw::c_uint,
+    pub cell: ::std::os::raw::c_uint,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ParticleLocation"][::std::mem::size_of::<ParticleLocation>() - 8usize];
+    ["Alignment of ParticleLocation"][::std::mem::align_of::<ParticleLocation>() - 4usize];
+    ["Offset of field: ParticleLocation::index"]
+        [::std::mem::offset_of!(ParticleLocation, index) - 0usize];
+    ["Offset of field: ParticleLocation::cell"]
+        [::std::mem::offset_of!(ParticleLocation, cell) - 4usize];
 };

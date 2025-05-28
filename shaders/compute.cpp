@@ -1,9 +1,9 @@
 #ifndef IGNORE_INCLUDES
 #include <metal_stdlib>
-using namespace metal;
 #include "shader_types.h"
-#define __NL__
 #endif
+
+using namespace metal;
 
 
 #define GRAVITY -9.81
@@ -14,45 +14,31 @@ using namespace metal;
 #define CONCAT(x,y) CONCAT1(x,y)
 #define PREFIX(x) CONCAT(x, __LINE__)
 #define for_neighbor(position, func) { \
-__NL__ int3 PREFIX(cell) = (int3) floor(position/compute_args.kernel_radius); \
-__NL__ uint PREFIX(grid_count) = compute_args.grid_dims.x * compute_args.grid_dims.y * compute_args.grid_dims.z; \
-__NL__ for (int z = -1; z < 2; z++) { \
-__NL__    for (int y = -1; y < 2; y++) { \
-__NL__        for (int x = -1; x < 2; x++) { \
-__NL__            int3 PREFIX(new_cell) = PREFIX(cell) + int3(x, y, z); \
-__NL__            if (PREFIX(new_cell).x < 0 || PREFIX(new_cell).y < 0 || PREFIX(new_cell).z < 0 || PREFIX(new_cell).x >= compute_args.grid_dims.x || PREFIX(new_cell).y >= compute_args.grid_dims.y || PREFIX(new_cell).z >= compute_args.grid_dims.z) { \
-__NL__               continue; \
-__NL__            } \
-__NL__            uint PREFIX(new_cell_hash) = hash_cell(PREFIX(new_cell)) % PREFIX(grid_count); \
-__NL__            int PREFIX(i) = cell_indices[PREFIX(new_cell_hash)]; \
-__NL__            if (PREFIX(i) == -1) { \
-__NL__                continue; \
-__NL__            } \
-__NL__            ParticleLocation PREFIX(location) = cells[PREFIX(i)]; \
-__NL__            do { \
-__NL__                os_log_default.log_debug("neighbor %d", PREFIX(i)); \
-__NL__                int j_id = PREFIX(location).index; \
-__NL__                PREFIX(i)++; \
-__NL__                PREFIX(location) = cells[PREFIX(i)]; \
-__NL__                func \
-__NL__            } while (PREFIX(location).cell == PREFIX(new_cell_hash)); \
-__NL__        } \
-__NL__    } \
+int3 PREFIX(cell) = (int3) floor(position/compute_args.kernel_radius); \
+uint PREFIX(grid_count) = compute_args.grid_dims.x * compute_args.grid_dims.y * compute_args.grid_dims.z; \
+for (int z = -1; z < 2; z++) { \
+    for (int y = -1; y < 2; y++) { \
+        for (int x = -1; x < 2; x++) { \
+            int3 PREFIX(new_cell) = PREFIX(cell) + int3(x, y, z); \
+            if (PREFIX(new_cell).x < 0 || PREFIX(new_cell).y < 0 || PREFIX(new_cell).z < 0 || PREFIX(new_cell).x >= compute_args.grid_dims.x || PREFIX(new_cell).y >= compute_args.grid_dims.y || PREFIX(new_cell).z >= compute_args.grid_dims.z) { \
+                continue; \
+            } \
+            uint PREFIX(new_cell_hash) = hash_cell(PREFIX(new_cell)) % PREFIX(grid_count); \
+            int PREFIX(i) = cell_indices[PREFIX(new_cell_hash)]; \
+            if (PREFIX(i) == -1) { \
+                continue; \
+            } \
+            ParticleLocation PREFIX(location) = cells[PREFIX(i)]; \
+            do { \
+                os_log_default.log_debug("neighbor %d", PREFIX(i)); \
+                int j_id = PREFIX(location).index; \
+                PREFIX(i)++; \
+                PREFIX(location) = cells[PREFIX(i)]; \
+                func \
+            } while (PREFIX(location).cell == PREFIX(new_cell_hash)); \
+        } \
+    } \
 } }
-
-uint hash_cell(int3 cell)
-{
-     const uint hashK1 = 15823;
-     const uint hashK2 = 9737333;
-     const uint hashK3 = 440817757;
-    const uint blockSize = 50;
-    uint3 ucell = (uint3) (cell + blockSize / 2);
-
-    uint3 localCell = ucell % blockSize;
-    uint3 blockID = ucell / blockSize;
-    uint blockHash = blockID.x * hashK1 + blockID.y * hashK2 + blockID.z * hashK3;
-    return localCell.x + blockSize * (localCell.y + blockSize * localCell.z) + blockHash;
-}
 
 device Particle* constant particles [[buffer(0)]];
 device ComputeArguments& constant compute_args [[buffer(1)]];
@@ -88,9 +74,6 @@ float3 gradient_kernel(Particle i, Particle j, float H) {
     float dist = length(i.position-j.position);
     float q = dist / H;
     float m_L = 48 / (M_PI_F * pow(H, 3));
-    if (dist == float(0)) {
-        return float(0);
-    }
     if (dist > EPS && (q <= 1.0f))
     {
         float3 grad_q = (i.position-j.position) * (1.0f / (dist * H));
@@ -113,19 +96,29 @@ float3 gradient_kernel(Particle i, Particle j, float H) {
 float density_pressure_force(uint id) {
     Particle i = particles[id];
     float pressure_force = 0.0;
-    for_neighbor(i.position, {
+    for (int j_id = 0; j_id < compute_args.num_particles; j_id++) {
         if (j_id == id) {
             continue;
         }
         Particle j = particles[j_id];
-        float3 diff = i.pressure_acceleration - j.pressure_acceleration;
-        float3 gradient = gradient_kernel(i, j, compute_args.kernel_radius);
-        pressure_force += dot(diff, gradient);
-    })
+        pressure_force += dot(i.pressure_acceleration - j.pressure_acceleration, gradient_kernel(i, j, compute_args.kernel_radius));
+    }
     return pressure_force * compute_args.volume;
 }
 
+uint hash_cell(int3 cell)
+{
+     const uint hashK1 = 15823;
+     const uint hashK2 = 9737333;
+     const uint hashK3 = 440817757;
+    const uint blockSize = 50;
+    uint3 ucell = (uint3) (cell + blockSize / 2);
 
+    uint3 localCell = ucell % blockSize;
+    uint3 blockID = ucell / blockSize;
+    uint blockHash = blockID.x * hashK1 + blockID.y * hashK2 + blockID.z * hashK3;
+    return localCell.x + blockSize * (localCell.y + blockSize * localCell.z) + blockHash;
+}
 
 kernel void compute_cell() {
     device Particle& i = particles[id];
@@ -167,7 +160,7 @@ template<typename F, F func, typename... Args> void get_neighbors(float3 positio
 kernel void compute_pressure_accel() {
     device Particle& i = particles[id];
     i.pressure_acceleration = float3(0);
-    for_neighbor(i.position, {
+    for (int j_id = 0; j_id < compute_args.num_particles; j_id++) {
         if (j_id == id) {
             continue;
         }
@@ -176,19 +169,22 @@ kernel void compute_pressure_accel() {
         if (fabs(sum) > EPS) {
             i.pressure_acceleration += sum * -compute_args.volume * gradient_kernel(i, j, compute_args.kernel_radius);
         }
-    })
+    }
 }
 
 kernel void compute_pressure_accel2() {
     device Particle& i = particles[id];
     i.pressure_acceleration = float3(0);
-    for_neighbor(i.position, {
+    for (int j_id = 0; j_id < compute_args.num_particles; j_id++) {
+        if (j_id == id) {
+            continue;
+        }
         Particle j = particles[j_id];
         float sum = i.pressure_rho2v + j.pressure_rho2v;
         if (fabs(sum) > EPS) {
             i.pressure_acceleration += sum * -compute_args.volume * gradient_kernel(i, j, compute_args.kernel_radius);
         }
-    })
+    }
 }
 
 
@@ -263,7 +259,6 @@ kernel void compute_densities_and_factors() {
     i.density = 0;
     float3 sum = 0;
     float sum_squared = 0;
-    i.neighbors = 0;
     for_neighbor(i.position, {
         Particle j = particles[j_id];
         i.density += compute_args.volume * kernal(i, j, compute_args.kernel_radius);
@@ -271,15 +266,13 @@ kernel void compute_densities_and_factors() {
             continue;;
         }
         float3 gradient = -compute_args.volume * gradient_kernel(i, j, compute_args.kernel_radius);
+        sum += gradient;
         sum_squared += length_squared(gradient);
-        sum -= gradient;
-        i.neighbors += 1;
     });
     //get_neighbors<decltype(compute_density_factor), compute_density_factor>(i.position, &sum, &sum_squared);
     i.density *= compute_args.rest_density;
-    sum_squared += length_squared(sum);
-    if (sum_squared > EPS) {
-        i.factor = 1.0 / sum_squared;
+    if (dot(sum, sum) + sum_squared > EPS) {
+        i.factor = 1.0 / (dot(sum, sum) + sum_squared);
     } else {
         i.factor = 0.0;
     }
@@ -300,7 +293,7 @@ kernel void non_pressure_forces() {
 
 kernel void update_positions() {
     particles[id].position += particles[id].velocity * delta_time;
-    float y_edge = compute_args.size.y;
+    float y_edge = compute_args.grid_dims.y;
     if (particles[id].position.y - compute_args.kernel_radius < 0) {
         particles[id].position.y = compute_args.kernel_radius;
         particles[id].velocity.y *= -0.5;
@@ -309,7 +302,7 @@ kernel void update_positions() {
         particles[id].position.y = y_edge - compute_args.kernel_radius;
         particles[id].velocity.y *= -0.5;
     }
-    float x_edge = compute_args.size.x;
+    float x_edge = compute_args.grid_dims.x;
     if (particles[id].position.x - compute_args.kernel_radius < 0) {
         particles[id].position.x = compute_args.kernel_radius;
         particles[id].velocity.x *= -0.5;
@@ -318,7 +311,7 @@ kernel void update_positions() {
         particles[id].position.x = x_edge - compute_args.kernel_radius;
         particles[id].velocity.x *= -0.5;
     }
-    float z_edge = compute_args.size.z;
+    float z_edge = compute_args.grid_dims.z;
     if (particles[id].position.z - compute_args.kernel_radius < 0) {
         particles[id].position.z = compute_args.kernel_radius;
         particles[id].velocity.z *= -0.5;
@@ -345,13 +338,13 @@ kernel void correct_density_error() {
 kernel void compute_density_adv() {
     device Particle& i = particles[id];
     float delta = 0.0f;
-    for_neighbor(i.position, {
+    for (int j_id = 0; j_id < compute_args.num_particles; j_id++) {
         if (j_id == id) {
             continue;
         }
         Particle j = particles[j_id];
-        delta += compute_args.volume * dot( i.velocity-j.velocity, gradient_kernel(i, j, compute_args.kernel_radius));
-    })
+        delta += compute_args.volume * dot(gradient_kernel(i, j, compute_args.kernel_radius), i.velocity-j.velocity);
+    }
     
     i.density_adv = i.density / compute_args.rest_density + delta_time * delta;
     
@@ -363,21 +356,16 @@ kernel void compute_density_adv() {
 kernel void compute_density_change() {
     device Particle& i = particles[id];
     i.density_adv = 0.0f;
-    for_neighbor(i.position, {
+    for (int j_id = 0; j_id < compute_args.num_particles; j_id++) {
         if (j_id == id) {
             continue;
         }
         Particle j = particles[j_id];
         i.density_adv += compute_args.volume * dot(gradient_kernel(i, j, compute_args.kernel_radius), i.velocity-j.velocity);
-    })
-    i.density_adv = max(i.density_adv, 0.0);
-    if (i.neighbors < 20) {
-        i.density_adv = 0.0f;
     }
-
+    
     i.factor *= 1/delta_time;
-    //i.pressure_rho2v = max(i.density_adv, 0.0) * i.factor;
-    i.pressure_rho2v = i.density_adv * i.factor;
+    i.pressure_rho2v = max(i.density_adv, 0.0) * i.factor;
 }
 
 kernel void correct_divergence_error() {
@@ -385,32 +373,11 @@ kernel void correct_divergence_error() {
     float pressure_force = delta_time * density_pressure_force(id);
     float residiuum = min(-i.density_adv - pressure_force, 0.0);
     //float residiuum = 1 - i.density_adv - pressure_force;
-    if (i.neighbors < 20) {
-        residiuum = 0.0;
-    }
     i.pressure_rho2v -= residiuum * i.factor;
     atomic_fetch_sub_explicit(&compute_args.density_error, compute_args.rest_density * residiuum/compute_args.num_particles, memory_order_relaxed);
 }
 
 kernel void update_velocities_from_pressure() {
     particles[id].velocity += delta_time * particles[id].pressure_acceleration;
-    particles[id].velocity += delta_time * particles[id].pressure_acceleration;
-}
-
-kernel void compute_pressure_accel_factor() {
-    device Particle& i = particles[id];
-    i.pressure_acceleration = float3(0);
-    for_neighbor(i.position, {
-        if (j_id == id) {
-            continue;
-        }
-        Particle j = particles[j_id];
-        float sum = i.pressure_rho2v + j.pressure_rho2v;
-        if (fabs(sum) > EPS) {
-            i.pressure_acceleration += sum * -compute_args.volume * gradient_kernel(i, j, compute_args.kernel_radius);
-        }
-    })
-
-    i.velocity *= delta_time * i.pressure_acceleration;
-    i.factor *= delta_time;
+    particles[id].factor *= delta_time;
 }

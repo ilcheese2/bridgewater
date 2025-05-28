@@ -1,7 +1,9 @@
+#ifndef IGNORE_INCLUDES
 #include <metal_stdlib>
-using namespace metal;
-
 #include "shader_types.h"
+#endif
+
+using namespace metal;
 
 struct VertexOut {
     float4 position [[position]];

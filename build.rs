@@ -1,6 +1,13 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::{env, fs};
+use std::fs::File;
+
+const INCLUDES: [&str; 3] = [
+    "#include <metal_stdlib>",
+    "using namespace metal;",
+    "#include \"shader_types.h\"",
+];
 
 fn main() {
     #[cfg(feature = "bindgen")]
@@ -19,15 +26,40 @@ fn compile_shaders() {
     for path in paths {
         let path = path.unwrap().path();
         //panic!("{:?}", path.extension().unwrap());
-        if !path.extension().unwrap().eq("metal") {
+        if !path.extension().unwrap().eq("metal") || path.to_str().unwrap().contains("_preprocessed.metal") {
             continue;
         }
+
+        let name = path.file_stem().unwrap().to_str().unwrap();
+        let preprocess_path = format!("shaders/{}_preprocessed.metal", name);
+        let preprocess_output = Command::new("xcrun")
+            .args(["-sdk", "macosx", "metal"])
+            .arg("-E")
+            .arg("-P")
+            .args(["-DIGNORE_INCLUDES"]) // i'm in hell send help
+            .arg(path.to_str().unwrap())
+            .arg("-o")
+            .arg(&preprocess_path)
+            .spawn()
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+        if !preprocess_output.status.success() {
+            panic!("preprocess failed");
+        }
+
+        // lovely
+        let mut modified = fs::read_to_string(&preprocess_path).unwrap();
+        println!("{}", INCLUDES.join("\n"));
+        modified.insert_str(0, INCLUDES.join("\n").as_str());
+        fs::write(&preprocess_path, modified.replace("__NL__", "\n")).unwrap();
+
         let output = Command::new("xcrun")
             .arg("-sdk")
             .arg("macosx")
             .arg("metal")
-            .args(["-frecord-sources", "-gline-tables-only"])
-            .args(["-c", path.to_str().unwrap()])
+            .args(["-frecord-sources", "-gline-tables-only", "-fmetal-enable-logging"])
+            .args(["-c", preprocess_path.as_str()])
             .args(["-o", format!("shaders/shaders{i}.air").as_str()])
             .spawn()
             .unwrap()
@@ -53,7 +85,7 @@ fn compile_shaders() {
         .wait_with_output()
         .expect("xcrun failed");
     if !output.status.success() {
-        panic!("failed to aggregate air files")
+        panic!("failed to  aggregate air files")
     }
 }
 
@@ -67,13 +99,13 @@ fn generate_rust_types_from_shader_types() {
     let bindings = bindgen::Builder::default()
         .header("shaders/shader_types.h")
         .allowlist_type("Particle")
-        .allowlist_type("simd_float3")
+        .allowlist_type("ParticleLocation")
         .allowlist_type("ComputeArguments")
         .detect_include_paths(true)
         .derive_default(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
-        .expect("Unable to generate bindings");
+        .expect("Unable to  generate bindings");
 
     bindings.write_to_file(out).unwrap();
     bindings.write_to_file("generated_header.rs").unwrap();

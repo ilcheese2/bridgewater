@@ -12,10 +12,11 @@ struct Particle { // https://gist.github.com/entropylost/75a3ff4e0fae22a27b40896
     vector_float3 pressure_acceleration;
     vector_float3 acceleration;
     float density;
-    float advected_density; // ρ* / ρ_0
+    float density_adv; // ρ* / ρ_0
     float factor;// s p / ρ^2 * ρ_0
     float pressure_rho2;
-    //float pressure_rho2v;
+    float pressure_rho2v;
+    int neighbors;
 };
 
 struct ComputeArguments {
@@ -27,4 +28,11 @@ struct ComputeArguments {
     atomic_uint time_step;
     atomic_float avg_density_derivative;
     atomic_float density_error;
+    vector_float3 size;
+    vector_int3 grid_dims;
+};
+
+struct ParticleLocation {
+    unsigned int index;
+    unsigned int cell;
 };
